@@ -1,12 +1,17 @@
 package google_drive
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/disintegration/imaging"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/alist-org/alist/v3/drivers/base"
+	"github.com/alist-org/alist/v3/internal/conf"
 	"github.com/alist-org/alist/v3/internal/driver"
 	"github.com/alist-org/alist/v3/internal/errs"
 	"github.com/alist-org/alist/v3/internal/model"
@@ -45,22 +50,71 @@ func (d *GoogleDrive) List(ctx context.Context, dir model.Obj, args model.ListAr
 		return nil, err
 	}
 	return utils.SliceConvert(files, func(src File) (model.Obj, error) {
-		return fileToObj(src), nil
+		return fileToObj(src, args), nil
 	})
 }
 
 func (d *GoogleDrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
 	url := fmt.Sprintf("https://www.googleapis.com/drive/v3/files/%s?includeItemsFromAllDrives=true&supportsAllDrives=true", file.GetID())
+
 	_, err := d.request(url, http.MethodGet, nil, nil)
 	if err != nil {
 		return nil, err
 	}
-	link := model.Link{
-		URL: url + "&alt=media&acknowledgeAbuse=true",
-		Header: http.Header{
+
+	link := model.Link{}
+
+	if args.Type == "thumb" && utils.Ext(file.GetName()) != "svg" {
+		thumbBase := filepath.Join(conf.Conf.TempDir, "..", "thumb")
+		thumbPath := filepath.Join(thumbBase, file.GetID()+".png")
+		if _, err := os.Stat(thumbBase); err != nil {
+			err := os.MkdirAll(thumbBase, 0o777)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if _, err := os.Stat(thumbPath); err == nil {
+
+		} else {
+
+			var srcBuf *bytes.Buffer
+			videoBuf, err := GetSnapshot(url+"&alt=media&acknowledgeAbuse=true", d.AccessToken)
+			if err != nil {
+				return nil, err
+			}
+			srcBuf = videoBuf
+			image, err := imaging.Decode(srcBuf)
+			if err != nil {
+				return nil, err
+			}
+			thumbImg := imaging.Resize(image, 144, 0, imaging.Lanczos)
+			var buf bytes.Buffer
+			err = imaging.Encode(&buf, thumbImg, imaging.PNG)
+			if err != nil {
+				return nil, err
+			}
+
+			thumbStream, err := os.Create(thumbPath)
+			if err != nil {
+				return nil, err
+			}
+
+			_, err = thumbStream.Write(buf.Bytes())
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		link.FilePath = &thumbPath
+
+		return &link, nil
+	} else {
+		link.URL = url + "&alt=media&acknowledgeAbuse=true"
+		link.Header = http.Header{
 			"Authorization": []string{"Bearer " + d.AccessToken},
-		},
+		}
 	}
+
 	return &link, nil
 }
 

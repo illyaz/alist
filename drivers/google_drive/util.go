@@ -1,10 +1,13 @@
 package google_drive
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	ffmpeg "github.com/u2takey/ffmpeg-go"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/alist-org/alist/v3/drivers/base"
@@ -15,6 +18,19 @@ import (
 )
 
 // do others that not defined in Driver interface
+
+func GetSnapshot(url string, accessToken string) (imgData *bytes.Buffer, err error) {
+	srcBuf := bytes.NewBuffer(nil)
+	err = ffmpeg.Input(url, ffmpeg.KwArgs{"headers": fmt.Sprintf("Authorization: Bearer %s", accessToken)}).
+		Output("pipe:", ffmpeg.KwArgs{"vf": "thumbnail", "frames:v": 1, "format": "image2", "vcodec": "mjpeg"}).
+		WithOutput(srcBuf, os.Stdout).
+		Run()
+
+	if err != nil {
+		return nil, err
+	}
+	return srcBuf, nil
+}
 
 func (d *GoogleDrive) refreshToken() error {
 	url := "https://www.googleapis.com/oauth2/v4/token"
@@ -82,7 +98,7 @@ func (d *GoogleDrive) getFiles(id string) ([]File, error) {
 		}
 		query := map[string]string{
 			"orderBy":  orderBy,
-			"fields":   "files(id,name,mimeType,size,modifiedTime,thumbnailLink,shortcutDetails),nextPageToken",
+			"fields":   "files(id,name,md5Checksum,mimeType,size,modifiedTime,thumbnailLink,shortcutDetails),nextPageToken",
 			"pageSize": "1000",
 			"q":        fmt.Sprintf("'%s' in parents and trashed = false", id),
 			//"includeItemsFromAllDrives": "true",

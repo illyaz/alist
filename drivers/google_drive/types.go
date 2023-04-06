@@ -1,7 +1,13 @@
 package google_drive
 
 import (
+	"github.com/alist-org/alist/v3/internal/conf"
+	"github.com/alist-org/alist/v3/internal/sign"
+	"github.com/alist-org/alist/v3/pkg/utils"
+	"github.com/alist-org/alist/v3/server/common"
+	stdpath "path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alist-org/alist/v3/internal/model"
@@ -31,8 +37,17 @@ type File struct {
 	} `json:"shortcutDetails"`
 }
 
-func fileToObj(f File) *model.ObjThumb {
+func fileToObj(f File, args model.ListArgs) *model.ObjThumb {
 	log.Debugf("google file: %+v", f)
+
+	thumb := f.ThumbnailLink
+
+	if thumb == "" && (strings.HasPrefix(f.MimeType, "video/") || utils.GetFileType(f.Name) == conf.VIDEO) {
+		thumb = common.GetApiUrl(nil) + stdpath.Join("/d", args.ReqPath, f.Name)
+		thumb = utils.EncodePath(thumb, true)
+		thumb += "?type=thumb&sign=" + sign.Sign(stdpath.Join(args.ReqPath, f.Name))
+	}
+
 	size, _ := strconv.ParseInt(f.Size, 10, 64)
 	obj := &model.ObjThumb{
 		Object: model.Object{
@@ -42,7 +57,9 @@ func fileToObj(f File) *model.ObjThumb {
 			Modified: f.ModifiedTime,
 			IsFolder: f.MimeType == "application/vnd.google-apps.folder",
 		},
-		Thumbnail: model.Thumbnail{},
+		Thumbnail: model.Thumbnail{
+			Thumbnail: thumb,
+		},
 	}
 	if f.MimeType == "application/vnd.google-apps.shortcut" {
 		obj.ID = f.ShortcutDetails.TargetId
