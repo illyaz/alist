@@ -62,7 +62,7 @@ func (d *Box) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*m
 			return nil, err
 		}
 
-		link.Status = 301
+		link.Status = 302
 		link.Header = http.Header{
 			"Location": []string{res.Header().Get("location")},
 		}
