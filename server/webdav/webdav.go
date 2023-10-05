@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alist-org/alist/v3/internal/stream"
+
 	"github.com/alist-org/alist/v3/internal/errs"
 	"github.com/alist-org/alist/v3/internal/fs"
 	"github.com/alist-org/alist/v3/internal/model"
@@ -71,6 +73,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			status, err = h.handleUnlock(brw, r)
 		case "PROPFIND":
 			status, err = h.handlePropfind(brw, r)
+			// if there is a error for PROPFIND, we should be as an empty folder to the client
+			if err != nil {
+				status = http.StatusNotFound
+			}
 		case "PROPPATCH":
 			status, err = h.handleProppatch(brw, r)
 		}
@@ -214,20 +220,24 @@ func (h *Handler) handleGetHeadPost(w http.ResponseWriter, r *http.Request) (sta
 	user := ctx.Value("user").(*model.User)
 	reqPath, err = user.JoinPath(reqPath)
 	if err != nil {
-		return 403, err
+		return http.StatusForbidden, err
 	}
 	fi, err := fs.Get(ctx, reqPath, &fs.GetArgs{})
 	if err != nil {
 		return http.StatusNotFound, err
-	}
-	if fi.IsDir() {
-		return http.StatusMethodNotAllowed, nil
 	}
 	etag, err := findETag(ctx, h.LockSystem, reqPath, fi)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
 	w.Header().Set("ETag", etag)
+	if r.Method == http.MethodHead {
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", fi.GetSize()))
+		return http.StatusOK, nil
+	}
+	if fi.IsDir() {
+		return http.StatusMethodNotAllowed, nil
+	}
 	// Let ServeContent determine the Content-Type header.
 	storage, _ := fs.GetStorage(reqPath, &fs.GetStoragesArgs{})
 	downProxyUrl := storage.GetStorage().DownProxyUrl
@@ -312,23 +322,29 @@ func (h *Handler) handlePut(w http.ResponseWriter, r *http.Request) (status int,
 	user := ctx.Value("user").(*model.User)
 	reqPath, err = user.JoinPath(reqPath)
 	if err != nil {
-		return 403, err
+		return http.StatusForbidden, err
 	}
 	obj := model.Object{
 		Name:     path.Base(reqPath),
 		Size:     r.ContentLength,
-		Modified: time.Now(),
+		Modified: h.getModTime(r),
+		Ctime:    h.getCreateTime(r),
 	}
-	stream := &model.FileStream{
-		Obj:        &obj,
-		ReadCloser: r.Body,
-		Mimetype:   r.Header.Get("Content-Type"),
+	stream := &stream.FileStream{
+		Obj:      &obj,
+		Reader:   r.Body,
+		Mimetype: r.Header.Get("Content-Type"),
 	}
 	if stream.Mimetype == "" {
 		stream.Mimetype = utils.GetMimeType(reqPath)
 	}
 	err = fs.PutDirectly(ctx, path.Dir(reqPath), stream)
+	if errs.IsNotFoundError(err) {
+		return http.StatusNotFound, err
+	}
 
+	_ = r.Body.Close()
+	_ = stream.Close()
 	// TODO(rost): Returning 405 Method Not Allowed might not be appropriate.
 	if err != nil {
 		return http.StatusMethodNotAllowed, err
@@ -595,7 +611,7 @@ func (h *Handler) handlePropfind(w http.ResponseWriter, r *http.Request) (status
 	}
 	fi, err := fs.Get(ctx, reqPath, &fs.GetArgs{})
 	if err != nil {
-		if errs.IsObjectNotFound(err) {
+		if errs.IsNotFoundError(err) {
 			return http.StatusNotFound, err
 		}
 		return http.StatusMethodNotAllowed, err

@@ -3,6 +3,8 @@ package drivers
 import (
 	_ "github.com/alist-org/alist/v3/drivers/115"
 	_ "github.com/alist-org/alist/v3/drivers/123"
+	_ "github.com/alist-org/alist/v3/drivers/123_link"
+	_ "github.com/alist-org/alist/v3/drivers/123_share"
 	_ "github.com/alist-org/alist/v3/drivers/139"
 	_ "github.com/alist-org/alist/v3/drivers/189"
 	_ "github.com/alist-org/alist/v3/drivers/189pc"
@@ -17,6 +19,8 @@ import (
 	_ "github.com/alist-org/alist/v3/drivers/baidu_share"
 	_ "github.com/alist-org/alist/v3/drivers/box"
 	_ "github.com/alist-org/alist/v3/drivers/cloudreve"
+	_ "github.com/alist-org/alist/v3/drivers/crypt"
+	_ "github.com/alist-org/alist/v3/drivers/dropbox"
 	_ "github.com/alist-org/alist/v3/drivers/ftp"
 	_ "github.com/alist-org/alist/v3/drivers/google_drive"
 	_ "github.com/alist-org/alist/v3/drivers/google_photo"
@@ -25,6 +29,7 @@ import (
 	_ "github.com/alist-org/alist/v3/drivers/local"
 	_ "github.com/alist-org/alist/v3/drivers/mediatrack"
 	_ "github.com/alist-org/alist/v3/drivers/mega"
+	_ "github.com/alist-org/alist/v3/drivers/mopan"
 	_ "github.com/alist-org/alist/v3/drivers/onedrive"
 	_ "github.com/alist-org/alist/v3/drivers/onedrive_app"
 	_ "github.com/alist-org/alist/v3/drivers/pikpak"
@@ -42,6 +47,8 @@ import (
 	_ "github.com/alist-org/alist/v3/drivers/uss"
 	_ "github.com/alist-org/alist/v3/drivers/virtual"
 	_ "github.com/alist-org/alist/v3/drivers/webdav"
+	_ "github.com/alist-org/alist/v3/drivers/weiyun"
+	_ "github.com/alist-org/alist/v3/drivers/wopan"
 	_ "github.com/alist-org/alist/v3/drivers/yandex_disk"
 )
 

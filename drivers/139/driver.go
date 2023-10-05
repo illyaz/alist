@@ -103,9 +103,9 @@ func (d *Yun139) MakeDir(ctx context.Context, parentDir model.Obj, dirName strin
 	return err
 }
 
-func (d *Yun139) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
+func (d *Yun139) Move(ctx context.Context, srcObj, dstDir model.Obj) (model.Obj, error) {
 	if d.isFamily() {
-		return errs.NotImplement
+		return nil, errs.NotImplement
 	}
 	var contentInfoList []string
 	var catalogInfoList []string
@@ -131,7 +131,10 @@ func (d *Yun139) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
 	}
 	pathname := "/orchestration/personalCloud/batchOprTask/v1.0/createBatchOprTask"
 	_, err := d.post(pathname, data, nil)
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return srcObj, nil
 }
 
 func (d *Yun139) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
@@ -300,6 +303,9 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 
 	var partSize = getPartSize(stream.GetSize())
 	part := (stream.GetSize() + partSize - 1) / partSize
+	if part == 0 {
+		part = 1
+	}
 	for i := int64(0); i < part; i++ {
 		if utils.IsCanceled(ctx) {
 			return ctx.Err()
@@ -331,13 +337,11 @@ func (d *Yun139) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 		if err != nil {
 			return err
 		}
+		_ = res.Body.Close()
 		log.Debugf("%+v", res)
-
 		if res.StatusCode != http.StatusOK {
 			return fmt.Errorf("unexpected status code: %d", res.StatusCode)
 		}
-
-		res.Body.Close()
 	}
 
 	return nil
