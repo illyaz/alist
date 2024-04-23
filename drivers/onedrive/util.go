@@ -52,6 +52,12 @@ func (d *Onedrive) GetMetaUrl(auth bool, path string) string {
 		} else {
 			return fmt.Sprintf("%s/v1.0/sites/%s/drive/root:%s:", host.Api, d.SiteId, path)
 		}
+	} else if d.IsDrive {
+		if path == "/" || path == "\\" {
+			return fmt.Sprintf("%s/v1.0/drives/%s/root", host.Api, d.DriveId)
+		} else {
+			return fmt.Sprintf("%s/v1.0/drives/%s/root:%s:", host.Api, d.DriveId, path)
+		}
 	} else {
 		if path == "/" || path == "\\" {
 			return fmt.Sprintf("%s/v1.0/me/drive/root", host.Api)
